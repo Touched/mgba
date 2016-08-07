@@ -36,6 +36,15 @@ static void _gdbStubDeinit(struct mDebugger* debugger) {
 	}
 }
 
+static void _gdbDebuggerEnterBreakpoint(struct GDBStub* stub, struct mDebuggerEntryInfo* info) {
+	// Adjust PC so that GDB treats this trap being due to the breakpoint
+	struct ARMCore* cpu = stub->d.core->cpu;
+	cpu->gprs[ARM_PC] = info->address;
+
+	// TODO: Use hwbreak/swbreak if gdb supports it
+	snprintf(stub->outgoing, GDB_STUB_MAX_LINE - 4, "S%02x", SIGTRAP);
+}
+
 static void _gdbStubEntered(struct mDebugger* debugger, enum mDebuggerEntryReason reason, struct mDebuggerEntryInfo* info) {
 	struct GDBStub* stub = (struct GDBStub*) debugger;
 	switch (reason) {
@@ -43,7 +52,7 @@ static void _gdbStubEntered(struct mDebugger* debugger, enum mDebuggerEntryReaso
 		snprintf(stub->outgoing, GDB_STUB_MAX_LINE - 4, "S%02x", SIGINT);
 		break;
 	case DEBUGGER_ENTER_BREAKPOINT:
-		snprintf(stub->outgoing, GDB_STUB_MAX_LINE - 4, "S%02x", SIGTRAP); // TODO: Use hwbreak/swbreak if gdb supports it
+		_gdbDebuggerEnterBreakpoint(stub, info);
 		break;
 	case DEBUGGER_ENTER_WATCHPOINT:
 		if (info) {
